@@ -23,6 +23,11 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    @GetMapping("/test")
+    public String test() {
+        return "Auth Controller is working";
+    }
+
     @PostMapping("/register")
     public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
 
