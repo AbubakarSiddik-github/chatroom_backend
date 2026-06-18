@@ -10,3 +10,6 @@ logs/
 .vscode/
 .idea/
 backend.zip
+payload.json
+temp_jar/
+ws-test/
