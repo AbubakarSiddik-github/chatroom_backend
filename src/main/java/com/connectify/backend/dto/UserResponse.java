@@ -8,5 +8,6 @@ public class UserResponse {
     private String username;
     private String email;
     private String avatarUrl;
+    private String bio;
     private boolean active;
 }

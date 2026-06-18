@@ -8,5 +8,14 @@ public class ChatMessage {
     private String senderId;
     private String senderName;
     private String content;
-    private String type; // TEXT, JOIN, LEAVE
+    private String type; // TEXT, IMAGE, FILE, JOIN, LEAVE
+
+    // Attachment fields
+    private String fileName;
+    private Long fileSize;
+    private String fileType;
+    private String publicId;
+
+    // Reply fields
+    private String replyToId;
 }

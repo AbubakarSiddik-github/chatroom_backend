@@ -16,7 +16,7 @@ public class Message {
     private String senderId;
     private String senderName;
     private String content;
-    private String type; // e.g., TEXT, IMAGE, FILE
+    private String type; // TEXT, IMAGE, FILE
     private String fileName;
     private Long fileSize;
     private String fileType;
@@ -25,7 +25,12 @@ public class Message {
     private boolean edited;
     private boolean deleted;
 
-    // Read receipts - list of userIds who have read this message
+    // Read receipts
     private List<String> readBy = new ArrayList<>();
     private Instant lastReadAt;
+
+    // Reply-to
+    private String replyToId;
+    private String replyToContent;
+    private String replyToSenderName;
 }

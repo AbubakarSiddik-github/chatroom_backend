@@ -27,10 +27,10 @@ public class ChatController {
         this.messageService = messageService;
     }
 
-    // ── PHASE 1: Room chat ─────────────────────────────────────────────────────
+    // ── Room chat ─────────────────────────────────────────────────────────────
     /**
-     * Client sends to:  /app/chat/{roomId}
-     * Server broadcasts to: /topic/room/{roomId}
+     * Client sends to:       /app/chat/{roomId}
+     * Server broadcasts to:  /topic/room/{roomId}
      */
     @MessageMapping("/chat/{roomId}")
     public void sendMessage(@DestinationVariable String roomId,
@@ -44,6 +44,27 @@ public class ChatController {
         savedMessage.setCreatedAt(Instant.now());
         savedMessage.setEdited(false);
         savedMessage.setDeleted(false);
+
+        // Attachment fields
+        savedMessage.setFileName(chatMessage.getFileName());
+        savedMessage.setFileSize(chatMessage.getFileSize());
+        savedMessage.setFileType(chatMessage.getFileType());
+        savedMessage.setPublicId(chatMessage.getPublicId());
+
+        // Reply fields — look up original message for preview text
+        if (chatMessage.getReplyToId() != null && !chatMessage.getReplyToId().isBlank()) {
+            Optional<Message> original = messageService.getMessageById(chatMessage.getReplyToId());
+            original.ifPresent(orig -> {
+                savedMessage.setReplyToId(orig.getId());
+                savedMessage.setReplyToSenderName(orig.getSenderName());
+                // Store a short preview (first 100 chars)
+                String preview = orig.getContent() != null ? orig.getContent() : "";
+                if ("IMAGE".equals(orig.getType())) preview = "📷 Photo";
+                else if ("FILE".equals(orig.getType())) preview = "📄 " + (orig.getFileName() != null ? orig.getFileName() : "File");
+                else if (preview.length() > 100) preview = preview.substring(0, 100) + "…";
+                savedMessage.setReplyToContent(preview);
+            });
+        }
 
         Message persisted = messageService.createMessage(savedMessage);
         messagingTemplate.convertAndSend("/topic/room/" + roomId, persisted);
@@ -63,52 +84,29 @@ public class ChatController {
         messagingTemplate.convertAndSend("/topic/room/" + roomId, chatMessage);
     }
 
-    // ── PHASE 2: Typing Indicator ─────────────────────────────────────────────
-    /**
-     * Client sends:  /app/typing/{roomId}
-     * Server broadcasts: /topic/typing/{roomId}  { typing: true }
-     */
+    // ── Typing Indicator ──────────────────────────────────────────────────────
     @MessageMapping("/typing/{roomId}")
-    public void userTyping(@DestinationVariable String roomId,
-                           @Payload TypingEvent event) {
+    public void userTyping(@DestinationVariable String roomId, @Payload TypingEvent event) {
         TypingResponse response = new TypingResponse(
-                event.getUserId(),
-                event.getUsername(),
-                true,
-                Instant.now().toString()
+                event.getUserId(), event.getUsername(), true, Instant.now().toString()
         );
         messagingTemplate.convertAndSend("/topic/typing/" + roomId, response);
     }
 
-    /**
-     * Client sends:  /app/typing-stop/{roomId}
-     * Server broadcasts: /topic/typing/{roomId}  { typing: false }
-     */
     @MessageMapping("/typing-stop/{roomId}")
-    public void userStopTyping(@DestinationVariable String roomId,
-                               @Payload TypingEvent event) {
+    public void userStopTyping(@DestinationVariable String roomId, @Payload TypingEvent event) {
         TypingResponse response = new TypingResponse(
-                event.getUserId(),
-                event.getUsername(),
-                false,
-                Instant.now().toString()
+                event.getUserId(), event.getUsername(), false, Instant.now().toString()
         );
         messagingTemplate.convertAndSend("/topic/typing/" + roomId, response);
     }
 
-    // ── PHASE 3: Read Receipt (WebSocket path) ────────────────────────────────
-    /**
-     * Client sends:  /app/read/{messageId}
-     * Server persists readBy + broadcasts to /topic/read/{roomId}
-     * Principal carries userId|username from JWT.
-     */
+    // ── Read Receipt (WebSocket path) ─────────────────────────────────────────
     @MessageMapping("/read/{messageId}")
-    public void markRead(@DestinationVariable String messageId,
-                         Principal principal) {
-
+    public void markRead(@DestinationVariable String messageId, Principal principal) {
         if (principal == null) return;
 
-        String[] parts = principal.getName().split("\\|", 2);
+        String[] parts  = principal.getName().split("\\|", 2);
         String userId   = parts[0];
         String username = parts.length > 1 ? parts[1] : "unknown";
 
@@ -116,15 +114,12 @@ public class ChatController {
         if (optionalMessage.isEmpty()) return;
 
         Message message = optionalMessage.get();
-
-        // Add user to readBy without duplicates
         if (!message.getReadBy().contains(userId)) {
             message.getReadBy().add(userId);
         }
         message.setLastReadAt(Instant.now());
         messageService.updateMessage(message);
 
-        // Broadcast receipt to the room
         ReadReceiptEvent event = new ReadReceiptEvent(
                 messageId, userId, username, Instant.now().toString()
         );

@@ -12,4 +12,5 @@ public class MessageRequest {
     private Long fileSize;
     private String fileType;
     private String publicId;
+    private String replyToId;
 }

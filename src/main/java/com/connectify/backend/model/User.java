@@ -19,5 +19,9 @@ public class User {
 
     private String avatarUrl;
 
+    private String avatarPublicId;
+
+    private String bio;
+
     private boolean active;
 }
